@@ -378,6 +378,7 @@ jobs:
 
               private fun dial(arg: String): String {
                   val d = digitsOf(arg)
+                  if (d.length >= 3) return call(arg)
                   startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(d)))
                       .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                   return if (d.isEmpty()) "Opening the dialer" else "Dialing $d"
@@ -489,7 +490,7 @@ jobs:
                           rootInActiveWindow?.findFocus(Node.FOCUS_INPUT)
                               ?.performAction(Node.AccessibilityAction.ACTION_IME_ENTER.id)
                       }
-                  }, 900)
+                  }, 450)
                   return "Searching for $q"
               }
           }
@@ -636,7 +637,7 @@ jobs:
                   val v = vs.firstOrNull { it.name == saved } ?: vs.firstOrNull { it.name in male } ?: vs.firstOrNull()
                   if (v != null) tts.voice = v
                   tts.setPitch(0.8f)
-                  tts.setSpeechRate(0.95f)
+                  tts.setSpeechRate(1.25f)
               }
 
               private fun showFace() {
@@ -660,6 +661,10 @@ jobs:
               private fun listen() {
                   val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                       .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                      .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 600L)
+                      .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 600L)
+                      .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                      .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
                   sr.startListening(i)
               }
 
@@ -670,10 +675,17 @@ jobs:
                       val reply = JarvisAccessibility.instance?.run(cmd) ?: "Please enable the Jarvis accessibility service"
                       tts.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "j")
                   }
-                  h.postDelayed({ listen() }, 300)
+                  h.postDelayed({ listen() }, 50)
               }
 
-              override fun onError(e: Int) { h.postDelayed({ listen() }, 600) }
+              override fun onError(e: Int) {
+                  val wait = when (e) {
+                      SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> 400L
+                      SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS, SpeechRecognizer.ERROR_CLIENT -> 1500L
+                      else -> 100L
+                  }
+                  h.postDelayed({ listen() }, wait)
+              }
 
               override fun onDestroy() {
                   h.removeCallbacksAndMessages(null)
@@ -710,7 +722,7 @@ jobs:
               android:canRequestFilterKeyEvents="true"
               android:accessibilityFlags="flagDefault|flagReportViewIds|flagIncludeNotImportantViews|flagRequestFilterKeyEvents"
               android:description="@string/app_name"
-              android:notificationTimeout="100"/>
+              android:notificationTimeout="10"/>
           JARVIS_EOF
           mkdir -p $(dirname build.gradle.kts)
           cat > build.gradle.kts <<'JARVIS_EOF'
