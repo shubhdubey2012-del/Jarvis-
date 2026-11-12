@@ -158,7 +158,7 @@ jobs:
           object Brain {
               private const val SYSTEM = """You are Jarvis, a voice assistant that controls an Android phone. The user's speech may be English, Hindi or Hinglish. Reply with exactly ONE line and nothing else.
           If the user wants a phone action, reply: CMD: <command> using only these commands:
-          open <app>; call <name or number>; dial <number>; whatsapp <name> | <message>; text <name> | <message>; search for <query>; type <text>; tap <text on screen>; scroll up; scroll down; go back; go home; recent apps; notifications; screenshot; lock screen; flashlight on; flashlight off; volume up; volume down; play; pause; next song; previous song; set alarm <H:MM am/pm>; timer <minutes>; take photo; answer call; decline call; read screen; read notifications; black out; good night; good morning
+          open <app>; call <name or number>; dial <number>; whatsapp <name> | <message>; text <name> | <message>; search for <query>; type <text>; tap <text on screen>; scroll up; scroll down; go back; go home; recent apps; notifications; screenshot; lock screen; flashlight on; flashlight off; volume up; volume down; play; pause; next song; previous song; set alarm <H:MM am/pm>; timer <minutes>; take photo; answer call; decline call; read screen; read notifications; black out; good night; good morning; play <song> on youtube; play <song> on spotify; navigate to <place>; google <query>; what time is it; what is the date; battery level; note <text>; read notes; remind me in <N> minutes to <task>
           Otherwise reply: SAY: <short spoken answer, at most 2 sentences, in the user's language>"""
 
               fun ask(key: String, text: String): String {
@@ -333,6 +333,8 @@ jobs:
           import android.hardware.camera2.CameraManager
           import android.media.AudioManager
           import android.net.Uri
+          import android.app.SearchManager
+          import android.os.BatteryManager
           import android.os.Build
           import android.os.Bundle
           import android.os.Handler
@@ -349,6 +351,8 @@ jobs:
           import android.view.WindowManager
           import android.view.accessibility.AccessibilityEvent
           import android.view.accessibility.AccessibilityNodeInfo as Node
+          import java.text.SimpleDateFormat
+          import java.util.Date
           import java.util.Locale
 
           class JarvisAccessibility : AccessibilityService() {
@@ -395,6 +399,24 @@ jobs:
                       c == "good morning" -> goodMorning()
                       c.startsWith("whatsapp ") || c.startsWith("message ") -> chat(raw.substringAfter(" "), true)
                       c.startsWith("text ") || c.startsWith("sms ") -> chat(raw.substringAfter(" "), false)
+                      c.startsWith("note ") || c.startsWith("take a note") || c.startsWith("take note") ||
+                          c.startsWith("add note") || c.startsWith("add a note") ->
+                          addNote(raw.replace(Regex("^(take a note|take note|note down|add a note|add note|note)\\s*",
+                              RegexOption.IGNORE_CASE), ""))
+                      c.startsWith("read") && c.contains("note") -> readNotes()
+                      c == "clear notes" || c == "delete notes" || c == "delete all notes" -> clearNotes()
+                      c.startsWith("remind me") -> remind(c)
+                      c.startsWith("navigate to ") -> navigate(raw.substring(12))
+                      c.startsWith("directions to ") -> navigate(raw.substring(14))
+                      c.startsWith("take me to ") -> navigate(raw.substring(11))
+                      c.startsWith("google ") -> web(raw.substring(7))
+                      c == "weather" || c.contains("the weather") -> web("weather today")
+                      c in listOf("time", "what time is it", "what's the time", "what is the time", "tell me the time",
+                          "current time") -> "It's ${timeNow()}"
+                      c in listOf("date", "what's the date", "what is the date", "today's date", "what day is it",
+                          "what day is today", "what is today's date", "what's today's date") -> "Today is ${dateNow()}"
+                      c == "battery" || c == "battery level" || c.startsWith("what") && c.contains("battery") ||
+                          c.startsWith("how much battery") -> battery()
                       c.startsWith("dial") -> dial(c.removePrefix("dial").trim())
                       c.startsWith("call ") -> call(c.removePrefix("call ").trim())
                       c in listOf("answer", "answer call", "pick up", "accept call") -> answer()
@@ -404,6 +426,7 @@ jobs:
                       c.startsWith("volume down") || c == "quieter" -> vol(AudioManager.ADJUST_LOWER)
                       c in listOf("play", "pause", "play music", "pause music", "stop music") ->
                           media(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+                      c.startsWith("play ") -> playQuery(c)
                       c.startsWith("next") -> media(KeyEvent.KEYCODE_MEDIA_NEXT)
                       c.startsWith("previous") -> media(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
                       c.startsWith("set alarm") || c.startsWith("alarm") -> alarm(c)
@@ -472,7 +495,7 @@ jobs:
 
               private fun goodMorning(): String {
                   try { getSystemService(AudioManager::class.java).ringerMode = AudioManager.RINGER_MODE_NORMAL } catch (e: Exception) { }
-                  return "Good morning. " + readNotifications()
+                  return "Good morning. It's ${timeNow()} on ${dateNow()}. ${battery()}. " + readNotifications()
               }
 
               // ---------- Calls & messages ----------
@@ -627,6 +650,87 @@ jobs:
                   return if (l.isEmpty()) "No new notifications, or notification access is off" else l.joinToString(" ")
               }
 
+              // ---------- Info, web, notes, reminders ----------
+              private fun timeNow() = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date())
+              private fun dateNow() = SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(Date())
+
+              private fun battery(): String {
+                  val b = getSystemService(BatteryManager::class.java)
+                  val p = b.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                  return "Battery is at $p percent" + (if (b.isCharging) " and charging" else "")
+              }
+
+              private fun web(q: String): String {
+                  if (q.isBlank()) return "What should I search for?"
+                  startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=" + Uri.encode(q.trim())))
+                      .addFlags(NEW))
+                  return "Searching Google for ${q.trim()}"
+              }
+
+              private fun navigate(place: String): String {
+                  val p = place.trim()
+                  if (p.isEmpty()) return "Where to?"
+                  try {
+                      startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=" + Uri.encode(p)))
+                          .setPackage("com.google.android.apps.maps").addFlags(NEW))
+                  } catch (e: Exception) {
+                      startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + Uri.encode(p))).addFlags(NEW))
+                  }
+                  return "Navigating to $p"
+              }
+
+              private fun playQuery(c: String): String {
+                  val spotify = c.contains(" on spotify")
+                  val q = c.removePrefix("play ").replace(" on youtube", "").replace(" on spotify", "").trim()
+                  if (q.isEmpty()) return media(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+                  try {
+                      if (spotify) {
+                          startActivity(Intent(MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH)
+                              .setPackage("com.spotify.music")
+                              .putExtra(MediaStore.EXTRA_MEDIA_FOCUS, "vnd.android.cursor.item/*")
+                              .putExtra(SearchManager.QUERY, q).addFlags(NEW))
+                      } else {
+                          startActivity(Intent(Intent.ACTION_SEARCH).setPackage("com.google.android.youtube")
+                              .putExtra("query", q).addFlags(NEW))
+                      }
+                  } catch (e: Exception) {
+                      startActivity(Intent(Intent.ACTION_VIEW,
+                          Uri.parse("https://www.youtube.com/results?search_query=" + Uri.encode(q))).addFlags(NEW))
+                  }
+                  return if (spotify) "Playing $q on Spotify" else "Opening YouTube for $q"
+              }
+
+              private fun noteStore() = getSharedPreferences("j", MODE_PRIVATE)
+              private fun noteList() = (noteStore().getString("notes", "") ?: "").lines().filter { it.isNotBlank() }
+
+              private fun addNote(t: String): String {
+                  if (t.isBlank()) return "What should the note say?"
+                  val all = noteList() + t.trim()
+                  noteStore().edit().putString("notes", all.takeLast(50).joinToString("\n")).apply()
+                  return "Noted"
+              }
+
+              private fun readNotes(): String {
+                  val l = noteList()
+                  return if (l.isEmpty()) "You have no notes" else "Your latest notes. " + l.takeLast(5).joinToString(". ")
+              }
+
+              private fun clearNotes(): String { noteStore().edit().remove("notes").apply(); return "Notes cleared" }
+
+              private fun remind(c: String): String {
+                  val m = Regex("in (\\d+)\\s*(seconds?|minutes?|mins?|hours?|hrs?)").find(c)
+                      ?: return "Say, remind me in 10 minutes to call Mom"
+                  val n = m.groupValues[1].toInt()
+                  val unit = m.groupValues[2]
+                  val secs = if (unit.startsWith("s")) n else if (unit.startsWith("h")) n * 3600 else n * 60
+                  var task = c.substringAfter(" to ", "").replace(m.value, "").trim()
+                  if (task.isEmpty()) task = "Reminder"
+                  startActivity(Intent(AlarmClock.ACTION_SET_TIMER)
+                      .putExtra(AlarmClock.EXTRA_LENGTH, secs).putExtra(AlarmClock.EXTRA_MESSAGE, task)
+                      .putExtra(AlarmClock.EXTRA_SKIP_UI, true).addFlags(NEW))
+                  return "Okay, I will remind you $task in $n $unit"
+              }
+
               // ---------- Screen control ----------
               private fun openApp(name: String): String {
                   val pm = packageManager
@@ -749,6 +853,7 @@ jobs:
           import android.widget.LinearLayout
           import android.widget.ScrollView
           import android.widget.Toast
+          import androidx.appcompat.app.AlertDialog
           import androidx.appcompat.app.AppCompatActivity
           import androidx.core.app.ActivityCompat
           import androidx.core.content.ContextCompat
@@ -820,6 +925,12 @@ jobs:
                   btn("Save Claude key") {
                       prefs.edit().putString("key", key.text.toString().trim()).apply()
                       Toast.makeText(a, "Saved", Toast.LENGTH_SHORT).show()
+                  }
+                  btn("My notes") {
+                      val n = prefs.getString("notes", "") ?: ""
+                      AlertDialog.Builder(a).setTitle("Notes")
+                          .setMessage(if (n.isBlank()) "No notes yet. Say: Jarvis, note buy milk" else n)
+                          .setPositiveButton("OK", null).show()
                   }
                   btn("Stop Jarvis") { stopService(Intent(a, VoiceService::class.java)) }
                   setContentView(ScrollView(a).apply { addView(l) })
