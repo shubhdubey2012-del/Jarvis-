@@ -115,6 +115,10 @@ jobs:
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
               <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
               <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.SEND_SMS"/>
+              <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS"/>
+              <uses-permission android:name="com.android.alarm.permission.SET_ALARM"/>
               <uses-permission android:name="android.permission.CALL_PHONE"/>
               <uses-permission android:name="android.permission.READ_CONTACTS"/>
               <application android:label="Jarvis" android:theme="@style/Theme.Jarvis">
@@ -130,8 +134,54 @@ jobs:
                       <intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter>
                       <meta-data android:name="android.accessibilityservice" android:resource="@xml/accessibility_config"/>
                   </service>
+                  <service android:name=".JarvisNotifications" android:exported="true"
+                      android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+                      <intent-filter><action android:name="android.service.notification.NotificationListenerService"/></intent-filter>
+                  </service>
               </application>
           </manifest>
+          JARVIS_EOF
+          mkdir -p $(dirname app/src/main/java/com/jarvis/assistant/Brain.kt)
+          cat > app/src/main/java/com/jarvis/assistant/Brain.kt <<'JARVIS_EOF'
+          package com.jarvis.assistant
+
+          import java.net.HttpURLConnection
+          import java.net.URL
+          import org.json.JSONArray
+          import org.json.JSONObject
+
+          /** Optional Claude brain: turns free speech (English/Hindi/Hinglish) into a phone command or a spoken answer. */
+          object Brain {
+              private const val SYSTEM = """You are Jarvis, a voice assistant that controls an Android phone. The user's speech may be English, Hindi or Hinglish. Reply with exactly ONE line and nothing else.
+          If the user wants a phone action, reply: CMD: <command> using only these commands:
+          open <app>; call <name or number>; dial <number>; whatsapp <name> | <message>; text <name> | <message>; search for <query>; type <text>; tap <text on screen>; scroll up; scroll down; go back; go home; recent apps; notifications; screenshot; lock screen; flashlight on; flashlight off; volume up; volume down; play; pause; next song; previous song; set alarm <H:MM am/pm>; timer <minutes>; take photo; answer call; decline call; read screen; read notifications; black out; good night; good morning
+          Otherwise reply: SAY: <short spoken answer, at most 2 sentences, in the user's language>"""
+
+              fun ask(key: String, text: String): String {
+                  return try {
+                      val c = URL("https://api.anthropic.com/v1/messages").openConnection() as HttpURLConnection
+                      c.requestMethod = "POST"
+                      c.connectTimeout = 8000
+                      c.readTimeout = 15000
+                      c.doOutput = true
+                      c.setRequestProperty("content-type", "application/json")
+                      c.setRequestProperty("x-api-key", key)
+                      c.setRequestProperty("anthropic-version", "2023-06-01")
+                      val body = JSONObject()
+                          .put("model", "claude-haiku-5-5")
+                          .put("max_tokens", 150)
+                          .put("system", SYSTEM)
+                          .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", text)))
+                          .toString()
+                      c.outputStream.use { it.write(body.toByteArray()) }
+                      if (c.responseCode != 200) "SAY: Claude returned error ${c.responseCode}"
+                      else JSONObject(c.inputStream.bufferedReader().readText())
+                          .getJSONArray("content").getJSONObject(0).getString("text").trim()
+                  } catch (e: Exception) {
+                      "SAY: I couldn't reach Claude"
+                  }
+              }
+          }
           JARVIS_EOF
           mkdir -p $(dirname app/src/main/java/com/jarvis/assistant/BreachView.kt)
           cat > app/src/main/java/com/jarvis/assistant/BreachView.kt <<'JARVIS_EOF'
@@ -206,7 +256,7 @@ jobs:
           import kotlin.math.abs
           import kotlin.math.sin
 
-          enum class FaceState { IDLE, SPEAKING }
+          enum class FaceState { IDLE, THINKING, SPEAKING }
 
           object JarvisState {
               val views = mutableSetOf<FaceView>()
@@ -233,7 +283,13 @@ jobs:
                   val w = width.toFloat(); val h = height.toFloat(); val s = minOf(w, h)
                   val cx = w / 2; val cy = h / 2; val r = s / 2 * 0.92f
                   val speaking = JarvisState.state == FaceState.SPEAKING
-                  val col = if (speaking) 0xFF00E5FF.toInt() else 0xFF0091EA.toInt()
+                  val thinking = JarvisState.state == FaceState.THINKING
+                  val col = when {
+                      speaking -> 0xFF00E5FF.toInt()
+                      thinking -> 0xFFFFC400.toInt()
+                      else -> 0xFF0091EA.toInt()
+                  }
+                  val look = if (thinking) sin(t * tau * 2) * r * 0.1f else 0f
 
                   p.style = Paint.Style.FILL; p.color = 0xFF0A1628.toInt(); p.alpha = 255
                   cv.drawCircle(cx, cy, r, p)
@@ -246,8 +302,8 @@ jobs:
                   val blink = if (t in 0.92f..0.97f) 0.1f else 1f
                   p.style = Paint.Style.FILL; p.color = col
                   val ey = cy - r * 0.2f; val ex = r * 0.4f; val ew = r * 0.16f; val eh = r * 0.22f * blink
-                  cv.drawOval(cx - ex - ew, ey - eh, cx - ex + ew, ey + eh, p)
-                  cv.drawOval(cx + ex - ew, ey - eh, cx + ex + ew, ey + eh, p)
+                  cv.drawOval(cx - ex - ew + look, ey - eh, cx - ex + ew + look, ey + eh, p)
+                  cv.drawOval(cx + ex - ew + look, ey - eh, cx + ex + ew + look, ey + eh, p)
 
                   val my = cy + r * 0.42f
                   if (speaking) {
@@ -269,22 +325,35 @@ jobs:
           import android.content.Intent
           import android.content.pm.PackageManager
           import android.graphics.PixelFormat
+          import android.hardware.camera2.CameraCharacteristics
+          import android.hardware.camera2.CameraManager
+          import android.media.AudioManager
           import android.net.Uri
           import android.os.Build
           import android.os.Bundle
           import android.os.Handler
           import android.os.Looper
           import android.os.SystemClock
+          import android.provider.AlarmClock
           import android.provider.ContactsContract.CommonDataKinds.Phone
+          import android.provider.MediaStore
+          import android.telecom.TelecomManager
+          import android.telephony.PhoneNumberUtils
+          import android.telephony.SmsManager
           import android.view.KeyEvent
           import android.view.View
           import android.view.WindowManager
           import android.view.accessibility.AccessibilityEvent
           import android.view.accessibility.AccessibilityNodeInfo as Node
+          import java.util.Locale
 
           class JarvisAccessibility : AccessibilityService() {
-              companion object { var instance: JarvisAccessibility? = null }
+              companion object {
+                  var instance: JarvisAccessibility? = null
+                  const val UNKNOWN = "Sorry, I don't know how to do that yet"
+              }
 
+              private val NEW = Intent.FLAG_ACTIVITY_NEW_TASK
               private val main = Handler(Looper.getMainLooper())
               private var breach: BreachView? = null
               private var volCount = 0
@@ -318,8 +387,26 @@ jobs:
                   return when {
                       c == "black out" || c == "blackout" || c == "black-out" -> showBreach()
                       c == "pleasure" -> hideBreach()
+                      c == "good night" -> goodNight()
+                      c == "good morning" -> goodMorning()
+                      c.startsWith("whatsapp ") || c.startsWith("message ") -> chat(raw.substringAfter(" "), true)
+                      c.startsWith("text ") || c.startsWith("sms ") -> chat(raw.substringAfter(" "), false)
                       c.startsWith("dial") -> dial(c.removePrefix("dial").trim())
                       c.startsWith("call ") -> call(c.removePrefix("call ").trim())
+                      c in listOf("answer", "answer call", "pick up", "accept call") -> answer()
+                      c in listOf("decline", "decline call", "reject", "reject call", "hang up", "end call") -> hangUp()
+                      c.startsWith("flashlight") || c.startsWith("torch") -> torch(!c.contains("off"))
+                      c.startsWith("volume up") || c == "louder" -> vol(AudioManager.ADJUST_RAISE)
+                      c.startsWith("volume down") || c == "quieter" -> vol(AudioManager.ADJUST_LOWER)
+                      c in listOf("play", "pause", "play music", "pause music", "stop music") ->
+                          media(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+                      c.startsWith("next") -> media(KeyEvent.KEYCODE_MEDIA_NEXT)
+                      c.startsWith("previous") -> media(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+                      c.startsWith("set alarm") || c.startsWith("alarm") -> alarm(c)
+                      c.startsWith("set timer") || c.startsWith("timer") -> timer(c)
+                      c.startsWith("take") && (c.contains("photo") || c.contains("picture") || c.contains("selfie")) -> photo()
+                      c == "read screen" || c == "read the screen" -> readScreen()
+                      c.startsWith("read") && c.contains("notification") -> readNotifications()
                       c == "search" || c == "search bar" || c == "open search" || c == "open search bar" -> openSearch()
                       c.startsWith("search ") -> search(raw.substring(7).removePrefix("for ").trim())
                       c.startsWith("open ") -> openApp(c.removePrefix("open ").trim())
@@ -333,7 +420,7 @@ jobs:
                       c.contains("lock screen") || c == "lock" || c == "lock phone" -> g(GLOBAL_ACTION_LOCK_SCREEN, "Locking")
                       c.startsWith("scroll down") -> scroll(Node.ACTION_SCROLL_FORWARD)
                       c.startsWith("scroll up") -> scroll(Node.ACTION_SCROLL_BACKWARD)
-                      else -> "Sorry, I don't know how to do that yet"
+                      else -> UNKNOWN
                   }
               }
 
@@ -372,23 +459,36 @@ jobs:
                   return "Welcome back. Systems restored."
               }
 
-              // ---------- Calls ----------
+              // ---------- Routines ----------
+              private fun goodNight(): String {
+                  try { getSystemService(AudioManager::class.java).ringerMode = AudioManager.RINGER_MODE_VIBRATE } catch (e: Exception) { }
+                  main.postDelayed({ performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN) }, 3000)
+                  return "Good night. Phone on vibrate. Locking."
+              }
+
+              private fun goodMorning(): String {
+                  try { getSystemService(AudioManager::class.java).ringerMode = AudioManager.RINGER_MODE_NORMAL } catch (e: Exception) { }
+                  return "Good morning. " + readNotifications()
+              }
+
+              // ---------- Calls & messages ----------
               private fun digitsOf(s: String) =
                   s.split(" ").joinToString("") { words[it] ?: it }.filter { it.isDigit() || it == '+' }
 
               private fun dial(arg: String): String {
                   val d = digitsOf(arg)
                   if (d.length >= 3) return call(arg)
-                  startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(d)))
-                      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                  startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(d))).addFlags(NEW))
                   return if (d.isEmpty()) "Opening the dialer" else "Dialing $d"
               }
 
               private fun findNumber(name: String): String? {
-                  contentResolver.query(Phone.CONTENT_URI, arrayOf(Phone.NUMBER),
-                      "${Phone.DISPLAY_NAME} LIKE ?", arrayOf("%$name%"), null)?.use {
-                      if (it.moveToFirst()) return it.getString(0)
-                  }
+                  try {
+                      contentResolver.query(Phone.CONTENT_URI, arrayOf(Phone.NUMBER),
+                          "${Phone.DISPLAY_NAME} LIKE ?", arrayOf("%$name%"), null)?.use {
+                          if (it.moveToFirst()) return it.getString(0).filter { ch -> ch.isDigit() || ch == '+' }
+                      }
+                  } catch (e: Exception) { }
                   return null
               }
 
@@ -405,12 +505,122 @@ jobs:
                   }
                   val uri = Uri.parse("tel:" + Uri.encode(target))
                   return if (checkSelfPermission(Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
-                      startActivity(Intent(Intent.ACTION_CALL, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                      startActivity(Intent(Intent.ACTION_CALL, uri).addFlags(NEW))
                       "Calling $label"
                   } else {
-                      startActivity(Intent(Intent.ACTION_DIAL, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                      startActivity(Intent(Intent.ACTION_DIAL, uri).addFlags(NEW))
                       "Opening the dialer. Allow phone permission to call directly."
                   }
+              }
+
+              private fun chat(arg: String, whatsapp: Boolean): String {
+                  val (nameRaw, msg) = if ("|" in arg) arg.substringBefore("|").trim() to arg.substringAfter("|").trim()
+                      else arg.trim().substringBefore(" ") to arg.trim().substringAfter(" ", "")
+                  if (msg.isEmpty()) return "What should the message say?"
+                  val typed = digitsOf(nameRaw.lowercase())
+                  val num = if (typed.length >= 3 && nameRaw.any(Char::isDigit)) typed
+                      else findNumber(nameRaw) ?: return "I can't find $nameRaw in your contacts"
+                  if (whatsapp) {
+                      val e164 = PhoneNumberUtils.formatNumberToE164(num, Locale.getDefault().country)
+                          ?.removePrefix("+") ?: num.removePrefix("+")
+                      val uri = Uri.parse("https://wa.me/$e164?text=${Uri.encode(msg)}")
+                      try { startActivity(Intent(Intent.ACTION_VIEW, uri).setPackage("com.whatsapp").addFlags(NEW)) }
+                      catch (e: Exception) { startActivity(Intent(Intent.ACTION_VIEW, uri).addFlags(NEW)) }
+                      main.postDelayed({ click("send") }, 2500)
+                      return "Sending WhatsApp to $nameRaw"
+                  }
+                  if (checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED)
+                      return "Please allow SMS permission in the Jarvis app"
+                  return try {
+                      val sm = if (Build.VERSION.SDK_INT >= 31) getSystemService(SmsManager::class.java)
+                          else SmsManager.getDefault()
+                      sm.sendMultipartTextMessage(num, null, sm.divideMessage(msg), null, null)
+                      "Message sent to $nameRaw"
+                  } catch (e: Exception) { "I couldn't send the message" }
+              }
+
+              private fun answer(): String {
+                  if (checkSelfPermission(Manifest.permission.ANSWER_PHONE_CALLS) != PackageManager.PERMISSION_GRANTED)
+                      return "Please allow phone permission in the Jarvis app"
+                  getSystemService(TelecomManager::class.java).acceptRingingCall()
+                  return "Answering"
+              }
+
+              private fun hangUp(): String {
+                  if (checkSelfPermission(Manifest.permission.ANSWER_PHONE_CALLS) != PackageManager.PERMISSION_GRANTED)
+                      return "Please allow phone permission in the Jarvis app"
+                  return if (getSystemService(TelecomManager::class.java).endCall()) "Done" else "There is no call to end"
+              }
+
+              // ---------- Quick controls ----------
+              private fun torch(on: Boolean): String {
+                  return try {
+                      val cm = getSystemService(CameraManager::class.java)
+                      val id = cm.cameraIdList.firstOrNull {
+                          cm.getCameraCharacteristics(it).get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+                      } ?: return "This phone has no flashlight"
+                      cm.setTorchMode(id, on)
+                      if (on) "Flashlight on" else "Flashlight off"
+                  } catch (e: Exception) { "I couldn't use the flashlight" }
+              }
+
+              private fun vol(dir: Int): String {
+                  val am = getSystemService(AudioManager::class.java)
+                  repeat(3) { am.adjustStreamVolume(AudioManager.STREAM_MUSIC, dir, AudioManager.FLAG_SHOW_UI) }
+                  return if (dir == AudioManager.ADJUST_RAISE) "Volume up" else "Volume down"
+              }
+
+              private fun media(code: Int): String {
+                  val am = getSystemService(AudioManager::class.java)
+                  am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+                  am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+                  return "Okay"
+              }
+
+              private fun alarm(c: String): String {
+                  val m = Regex("(\\d{1,2})(?:[: ](\\d{2}))?\\s*(a\\.?m\\.?|p\\.?m\\.?)?").find(c.removePrefix("set "))
+                      ?: return "Which time should I set it for?"
+                  var h = m.groupValues[1].toInt()
+                  val min = m.groupValues[2].ifEmpty { "0" }.toInt()
+                  val ap = m.groupValues[3]
+                  if (ap.startsWith("p") && h < 12) h += 12
+                  if (ap.startsWith("a") && h == 12) h = 0
+                  if (h > 23 || min > 59) return "That time doesn't look right"
+                  startActivity(Intent(AlarmClock.ACTION_SET_ALARM)
+                      .putExtra(AlarmClock.EXTRA_HOUR, h).putExtra(AlarmClock.EXTRA_MINUTES, min)
+                      .putExtra(AlarmClock.EXTRA_SKIP_UI, true).addFlags(NEW))
+                  return "Alarm set for %d:%02d".format(h, min)
+              }
+
+              private fun timer(c: String): String {
+                  val mins = Regex("(\\d+)").find(c)?.groupValues?.get(1)?.toIntOrNull() ?: return "How many minutes?"
+                  startActivity(Intent(AlarmClock.ACTION_SET_TIMER)
+                      .putExtra(AlarmClock.EXTRA_LENGTH, mins * 60).putExtra(AlarmClock.EXTRA_SKIP_UI, true).addFlags(NEW))
+                  return "Timer set for $mins minutes"
+              }
+
+              private fun photo(): String {
+                  startActivity(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).addFlags(NEW))
+                  main.postDelayed({ click("shutter") }, 2000)
+                  return "Say cheese"
+              }
+
+              // ---------- Reading aloud ----------
+              private fun collect(n: Node?, out: StringBuilder) {
+                  if (n == null || out.length > 500) return
+                  n.text?.let { if (it.isNotBlank()) out.append(it).append(". ") }
+                  for (i in 0 until n.childCount) collect(n.getChild(i), out)
+              }
+
+              private fun readScreen(): String {
+                  val sb = StringBuilder()
+                  collect(rootInActiveWindow, sb)
+                  return if (sb.isEmpty()) "I can't read anything on this screen" else sb.toString().take(500)
+              }
+
+              private fun readNotifications(): String {
+                  val l = JarvisNotifications.recent.toList().takeLast(5)
+                  return if (l.isEmpty()) "No new notifications, or notification access is off" else l.joinToString(" ")
               }
 
               // ---------- Screen control ----------
@@ -420,7 +630,7 @@ jobs:
                       pm.getLaunchIntentForPackage(it.packageName) != null &&
                           pm.getApplicationLabel(it).toString().lowercase().contains(name)
                   }?.packageName ?: return "I can't find $name"
-                  startActivity(pm.getLaunchIntentForPackage(pkg)!!.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                  startActivity(pm.getLaunchIntentForPackage(pkg)!!.addFlags(NEW))
                   return "Opening $name"
               }
 
@@ -495,6 +705,29 @@ jobs:
               }
           }
           JARVIS_EOF
+          mkdir -p $(dirname app/src/main/java/com/jarvis/assistant/JarvisNotifications.kt)
+          cat > app/src/main/java/com/jarvis/assistant/JarvisNotifications.kt <<'JARVIS_EOF'
+          package com.jarvis.assistant
+
+          import android.app.Notification
+          import android.service.notification.NotificationListenerService
+          import android.service.notification.StatusBarNotification
+          import java.util.Collections
+
+          class JarvisNotifications : NotificationListenerService() {
+              companion object { val recent: MutableList<String> = Collections.synchronizedList(mutableListOf<String>()) }
+
+              override fun onNotificationPosted(sbn: StatusBarNotification) {
+                  val e = sbn.notification.extras
+                  val t = e.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
+                  val x = e.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+                  if (t.isNotBlank() || x.isNotBlank()) {
+                      recent.add("$t. $x")
+                      if (recent.size > 20) recent.removeAt(0)
+                  }
+              }
+          }
+          JARVIS_EOF
           mkdir -p $(dirname app/src/main/java/com/jarvis/assistant/MainActivity.kt)
           cat > app/src/main/java/com/jarvis/assistant/MainActivity.kt <<'JARVIS_EOF'
           package com.jarvis.assistant
@@ -506,8 +739,11 @@ jobs:
           import android.os.Bundle
           import android.provider.Settings
           import android.speech.tts.TextToSpeech
+          import android.text.InputType
           import android.widget.Button
+          import android.widget.EditText
           import android.widget.LinearLayout
+          import android.widget.ScrollView
           import android.widget.Toast
           import androidx.appcompat.app.AppCompatActivity
           import androidx.core.app.ActivityCompat
@@ -523,16 +759,18 @@ jobs:
                   super.onCreate(s)
                   val a = this
                   val d = resources.displayMetrics.density
+                  val prefs = getSharedPreferences("j", MODE_PRIVATE)
                   val l = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL; setPadding(48, 48, 48, 48) }
                   tts = TextToSpeech(a) { ttsReady = it == TextToSpeech.SUCCESS }
                   l.addView(FaceView(a), LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (260 * d).toInt()))
                   fun btn(label: String, click: () -> Unit) = l.addView(Button(a).apply {
                       text = label; setOnClickListener { click() }
                   })
-                  btn("1. Allow microphone, calls & contacts") {
-                      ActivityCompat.requestPermissions(a,
-                          arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS,
-                              Manifest.permission.CALL_PHONE, Manifest.permission.READ_CONTACTS), 1)
+                  btn("1. Allow microphone, calls, contacts & SMS") {
+                      ActivityCompat.requestPermissions(a, arrayOf(
+                          Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS,
+                          Manifest.permission.CALL_PHONE, Manifest.permission.READ_CONTACTS,
+                          Manifest.permission.ANSWER_PHONE_CALLS, Manifest.permission.SEND_SMS), 1)
                   }
                   btn("2. Enable Jarvis accessibility") {
                       startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -540,7 +778,10 @@ jobs:
                   btn("3. Show face over other apps") {
                       startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
                   }
-                  btn("4. Start listening") {
+                  btn("4. Allow notification reading (optional)") {
+                      startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                  }
+                  btn("5. Start listening") {
                       if (ContextCompat.checkSelfPermission(a, Manifest.permission.RECORD_AUDIO) ==
                           PackageManager.PERMISSION_GRANTED) {
                           ContextCompat.startForegroundService(a, Intent(a, VoiceService::class.java))
@@ -554,16 +795,30 @@ jobs:
                           Toast.makeText(a, "Voices not ready, try again", Toast.LENGTH_SHORT).show()
                           return@btn
                       }
-                      val p = getSharedPreferences("j", MODE_PRIVATE)
-                      val next = vs[(vs.indexOfFirst { it.name == p.getString("voice", null) } + 1) % vs.size]
-                      p.edit().putString("voice", next.name).apply()
+                      val next = vs[(vs.indexOfFirst { it.name == prefs.getString("voice", null) } + 1) % vs.size]
+                      prefs.edit().putString("voice", next.name).apply()
                       t.voice = next
                       t.setPitch(0.8f)
                       t.speak("Hello, I am Jarvis", TextToSpeech.QUEUE_FLUSH, null, "x")
                       Toast.makeText(a, "Voice ${vs.indexOf(next) + 1} of ${vs.size}", Toast.LENGTH_SHORT).show()
                   }
+                  btn("Language: switch English / Hindi") {
+                      val now = if (prefs.getString("lang", "en-IN") == "hi-IN") "en-IN" else "hi-IN"
+                      prefs.edit().putString("lang", now).apply()
+                      Toast.makeText(a, "Language: $now. Tap Stop Jarvis, then Start listening.", Toast.LENGTH_LONG).show()
+                  }
+                  val key = EditText(a).apply {
+                      hint = "Claude API key (optional, makes Jarvis smart)"
+                      inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                      setText(prefs.getString("key", ""))
+                  }
+                  l.addView(key)
+                  btn("Save Claude key") {
+                      prefs.edit().putString("key", key.text.toString().trim()).apply()
+                      Toast.makeText(a, "Saved", Toast.LENGTH_SHORT).show()
+                  }
                   btn("Stop Jarvis") { stopService(Intent(a, VoiceService::class.java)) }
-                  setContentView(l)
+                  setContentView(ScrollView(a).apply { addView(l) })
               }
           }
           JARVIS_EOF
@@ -591,12 +846,17 @@ jobs:
           import android.view.WindowManager
           import androidx.core.app.NotificationCompat
           import androidx.core.app.ServiceCompat
+          import java.util.Locale
 
           class VoiceService : Service(), RecognitionListener {
               private lateinit var sr: SpeechRecognizer
               private lateinit var tts: TextToSpeech
               private val h = Handler(Looper.getMainLooper())
               private var overlay: FaceView? = null
+              private val wake = listOf("jarvis", "जार्विस", "जारविस", "जर्विस")
+
+              private fun prefs() = getSharedPreferences("j", MODE_PRIVATE)
+              private fun lang() = prefs().getString("lang", "en-IN") ?: "en-IN"
 
               private val ttsListener = object : UtteranceProgressListener() {
                   override fun onStart(id: String?) { h.post { JarvisState.state = FaceState.SPEAKING } }
@@ -629,15 +889,16 @@ jobs:
               }
 
               private fun applyVoice() {
-                  val saved = getSharedPreferences("j", MODE_PRIVATE).getString("voice", null)
+                  tts.setPitch(0.8f)
+                  tts.setSpeechRate(1.25f)
+                  if (lang() == "hi-IN") { tts.language = Locale("hi", "IN"); return }
+                  val saved = prefs().getString("voice", null)
                   val male = listOf("en-gb-x-rjs-local", "en-gb-x-gbd-local", "en-gb-x-gbb-local",
                       "en-us-x-iom-local", "en-us-x-iol-local", "en-us-x-tpd-local")
                   val vs = tts.voices?.filter { it.locale.language == "en" && !it.isNetworkConnectionRequired }
                       ?.sortedBy { it.name } ?: emptyList()
                   val v = vs.firstOrNull { it.name == saved } ?: vs.firstOrNull { it.name in male } ?: vs.firstOrNull()
                   if (v != null) tts.voice = v
-                  tts.setPitch(0.8f)
-                  tts.setSpeechRate(1.25f)
               }
 
               private fun showFace() {
@@ -661,6 +922,7 @@ jobs:
               private fun listen() {
                   val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                       .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                      .putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang())
                       .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 600L)
                       .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 600L)
                       .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
@@ -668,13 +930,31 @@ jobs:
                   sr.startListening(i)
               }
 
+              private fun say(s: String) { tts.speak(s, TextToSpeech.QUEUE_FLUSH, null, "j") }
+
+              private fun handle(cmd: String) {
+                  val a = JarvisAccessibility.instance
+                  if (a == null) { say("Please enable the Jarvis accessibility service"); return }
+                  if (cmd.isEmpty()) { say("Yes?"); return }
+                  val r = a.run(cmd)
+                  if (r != JarvisAccessibility.UNKNOWN) { say(r); return }
+                  val key = prefs().getString("key", "") ?: ""
+                  if (key.isBlank()) { say("I don't know that one. Add your Claude key in the app to teach me."); return }
+                  JarvisState.state = FaceState.THINKING
+                  Thread {
+                      val out = Brain.ask(key, cmd)
+                      h.post {
+                          if (out.startsWith("CMD:")) say(JarvisAccessibility.instance?.run(out.removePrefix("CMD:").trim()) ?: "Please enable accessibility")
+                          else say(out.removePrefix("SAY:").trim())
+                      }
+                  }.start()
+              }
+
               override fun onResults(r: Bundle?) {
                   val t = r?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: ""
-                  if (t.lowercase().startsWith("jarvis")) {
-                      val cmd = t.substring(6).trim(' ', ',', '.')
-                      val reply = JarvisAccessibility.instance?.run(cmd) ?: "Please enable the Jarvis accessibility service"
-                      tts.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "j")
-                  }
+                  val low = t.lowercase().trim()
+                  val w = wake.firstOrNull { low.startsWith(it) }
+                  if (w != null) handle(t.trim().substring(w.length).trim(' ', ',', '.', '।'))
                   h.postDelayed({ listen() }, 50)
               }
 
