@@ -926,6 +926,12 @@ jobs:
                       prefs.edit().putString("key", key.text.toString().trim()).apply()
                       Toast.makeText(a, "Saved", Toast.LENGTH_SHORT).show()
                   }
+                  btn("Mute mic beeps: turn on / off") {
+                      val now = !prefs.getBoolean("quiet", true)
+                      prefs.edit().putBoolean("quiet", now).apply()
+                      Toast.makeText(a, if (now) "Beeps muted while no music plays. Restart Jarvis." else "Beeps allowed. Restart Jarvis.",
+                          Toast.LENGTH_LONG).show()
+                  }
                   btn("My notes") {
                       val n = prefs.getString("notes", "") ?: ""
                       AlertDialog.Builder(a).setTitle("Notes")
@@ -947,6 +953,7 @@ jobs:
           import android.content.Intent
           import android.content.pm.ServiceInfo
           import android.graphics.PixelFormat
+          import android.media.AudioManager
           import android.os.Bundle
           import android.os.Handler
           import android.os.IBinder
@@ -968,6 +975,12 @@ jobs:
               private lateinit var tts: TextToSpeech
               private val h = Handler(Looper.getMainLooper())
               private var overlay: FaceView? = null
+              private var muted = false
+              private var speaking = false
+              private val audio by lazy { getSystemService(AudioManager::class.java) }
+              private val watch = object : Runnable {
+                  override fun run() { if (muted && audio.isMusicActive) quiet(false); h.postDelayed(this, 700) }
+              }
               private var lastStatus = ""
               private var lastHeard = "nothing yet"
               private var lastProblem = "none"
@@ -977,10 +990,10 @@ jobs:
               private fun lang() = prefs().getString("lang", "en-IN") ?: "en-IN"
 
               private val ttsListener = object : UtteranceProgressListener() {
-                  override fun onStart(id: String?) { h.post { JarvisState.state = FaceState.SPEAKING } }
-                  override fun onDone(id: String?) { h.post { JarvisState.state = FaceState.IDLE } }
+                  override fun onStart(id: String?) { h.post { speaking = true; JarvisState.state = FaceState.SPEAKING } }
+                  override fun onDone(id: String?) { h.post { speaking = false; JarvisState.state = FaceState.IDLE } }
                   @Deprecated("Deprecated in Java")
-                  override fun onError(id: String?) { h.post { JarvisState.state = FaceState.IDLE } }
+                  override fun onError(id: String?) { h.post { speaking = false; JarvisState.state = FaceState.IDLE } }
               }
 
               private fun status(s: String) {
@@ -1026,6 +1039,7 @@ jobs:
                   sr.setRecognitionListener(this)
                   showFace()
                   listen()
+                  h.post(watch)
               }
 
               override fun onStartCommand(i: Intent?, f: Int, id: Int): Int {
@@ -1065,6 +1079,7 @@ jobs:
               }
 
               private fun listen() {
+                  quiet(true)
                   val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                       .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                       .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 600L)
@@ -1074,7 +1089,24 @@ jobs:
                   sr.startListening(i)
               }
 
-              private fun say(s: String) { tts.speak(s, TextToSpeech.QUEUE_FLUSH, null, "j") }
+              // Android's speech recognizer beeps on every start/stop. Mute the media stream while idle (not when music plays).
+              private fun quiet(on: Boolean) {
+                  try {
+                      if (on && prefs().getBoolean("quiet", true) && !speaking && !audio.isMusicActive) {
+                          audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE, 0)
+                          muted = true
+                      } else if (muted) {
+                          audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0)
+                          muted = false
+                      }
+                  } catch (e: Exception) { }
+              }
+
+              private fun say(s: String) {
+                  speaking = true
+                  quiet(false)
+                  tts.speak(s, TextToSpeech.QUEUE_FLUSH, null, "j")
+              }
 
               private fun handle(cmd: String) {
                   val a = JarvisAccessibility.instance
@@ -1118,6 +1150,8 @@ jobs:
               override fun onDestroy() {
                   h.removeCallbacksAndMessages(null)
                   try { overlay?.let { getSystemService(WindowManager::class.java).removeView(it) } } catch (e: Exception) { }
+                  speaking = true
+                  quiet(false)
                   JarvisState.state = FaceState.IDLE
                   sr.destroy(); tts.shutdown()
                   super.onDestroy()
