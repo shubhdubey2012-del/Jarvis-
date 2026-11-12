@@ -121,6 +121,10 @@ jobs:
               <uses-permission android:name="com.android.alarm.permission.SET_ALARM"/>
               <uses-permission android:name="android.permission.CALL_PHONE"/>
               <uses-permission android:name="android.permission.READ_CONTACTS"/>
+              <queries>
+                  <intent><action android:name="android.speech.RecognitionService"/></intent>
+                  <intent><action android:name="android.intent.action.TTS_SERVICE"/></intent>
+              </queries>
               <application android:label="Jarvis" android:theme="@style/Theme.Jarvis">
                   <activity android:name=".MainActivity" android:exported="true">
                       <intent-filter>
@@ -853,6 +857,9 @@ jobs:
               private lateinit var tts: TextToSpeech
               private val h = Handler(Looper.getMainLooper())
               private var overlay: FaceView? = null
+              private var lastStatus = ""
+              private var lastHeard = "nothing yet"
+              private var lastProblem = "none"
               private val wake = listOf("jarvis", "जार्विस", "जारविस", "जर्विस")
 
               private fun prefs() = getSharedPreferences("j", MODE_PRIVATE)
@@ -863,6 +870,32 @@ jobs:
                   override fun onDone(id: String?) { h.post { JarvisState.state = FaceState.IDLE } }
                   @Deprecated("Deprecated in Java")
                   override fun onError(id: String?) { h.post { JarvisState.state = FaceState.IDLE } }
+              }
+
+              private fun status(s: String) {
+                  if (s == lastStatus) return
+                  lastStatus = s
+                  val n = NotificationCompat.Builder(this, "j").setContentTitle("Jarvis")
+                      .setContentText(s).setStyle(NotificationCompat.BigTextStyle().bigText(s))
+                      .setSmallIcon(android.R.drawable.ic_btn_speak_now).setOnlyAlertOnce(true).build()
+                  getSystemService(NotificationManager::class.java).notify(1, n)
+              }
+
+              private fun refresh() = status("Listening. Heard: $lastHeard. Problem: $lastProblem")
+
+              private fun errName(e: Int) = when (e) {
+                  1 -> "network timeout"
+                  2 -> "network error"
+                  3 -> "audio error"
+                  4 -> "server error"
+                  5 -> "no speech service (client)"
+                  8 -> "recognizer busy"
+                  9 -> "microphone permission missing"
+                  10 -> "too many requests"
+                  11 -> "server disconnected"
+                  12 -> "language not supported"
+                  13 -> "language unavailable"
+                  else -> "error $e"
               }
 
               override fun onBind(i: Intent?): IBinder? = null
@@ -877,6 +910,7 @@ jobs:
                   tts = TextToSpeech(this) {
                       if (it == TextToSpeech.SUCCESS) { tts.setOnUtteranceProgressListener(ttsListener); applyVoice() }
                   }
+                  if (!SpeechRecognizer.isRecognitionAvailable(this)) lastProblem = "no speech recognition on this phone"
                   sr = SpeechRecognizer.createSpeechRecognizer(this)
                   sr.setRecognitionListener(this)
                   showFace()
@@ -922,11 +956,10 @@ jobs:
               private fun listen() {
                   val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                       .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                      .putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang())
                       .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 600L)
                       .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 600L)
-                      .putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
                       .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                  if (lang() == "hi-IN") i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
                   sr.startListening(i)
               }
 
@@ -952,13 +985,17 @@ jobs:
 
               override fun onResults(r: Bundle?) {
                   val t = r?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: ""
-                  val low = t.lowercase().trim()
-                  val w = wake.firstOrNull { low.startsWith(it) }
-                  if (w != null) handle(t.trim().substring(w.length).trim(' ', ',', '.', '।'))
+                  if (t.isNotBlank()) lastHeard = t.take(60)
+                  val low = t.lowercase()
+                  val w = wake.firstOrNull { low.contains(it) }
+                  if (w != null) handle(t.substring(low.indexOf(w) + w.length).trim(' ', ',', '.', '।'))
+                  refresh()
                   h.postDelayed({ listen() }, 50)
               }
 
               override fun onError(e: Int) {
+                  if (e != 6 && e != 7) lastProblem = errName(e)
+                  refresh()
                   val wait = when (e) {
                       SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> 400L
                       SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS, SpeechRecognizer.ERROR_CLIENT -> 1500L
@@ -975,7 +1012,7 @@ jobs:
                   super.onDestroy()
               }
 
-              override fun onReadyForSpeech(p: Bundle?) {}
+              override fun onReadyForSpeech(p: Bundle?) { refresh() }
               override fun onBeginningOfSpeech() {}
               override fun onRmsChanged(v: Float) {}
               override fun onBufferReceived(b: ByteArray?) {}
