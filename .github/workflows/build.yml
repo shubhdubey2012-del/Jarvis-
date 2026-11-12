@@ -29,6 +29,14 @@ jobs:
           }
           android {
               namespace = "com.jarvis.assistant"
+              signingConfigs {
+                  getByName("debug") {
+                      storeFile = file("debug.keystore")
+                      storePassword = "android"
+                      keyAlias = "androiddebugkey"
+                      keyPassword = "android"
+                  }
+              }
               compileSdk = 34
               defaultConfig {
                   applicationId = "com.jarvis.assistant"
@@ -48,6 +56,56 @@ jobs:
               implementation("androidx.appcompat:appcompat:1.7.0")
           }
           JARVIS_EOF
+          mkdir -p $(dirname app/debug.keystore.b64)
+          cat > app/debug.keystore.b64 <<'JARVIS_EOF'
+          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
+          JARVIS_EOF
           mkdir -p $(dirname app/src/main/AndroidManifest.xml)
           cat > app/src/main/AndroidManifest.xml <<'JARVIS_EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -56,6 +114,9 @@ jobs:
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
               <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
               <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
+              <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+              <uses-permission android:name="android.permission.CALL_PHONE"/>
+              <uses-permission android:name="android.permission.READ_CONTACTS"/>
               <application android:label="Jarvis" android:theme="@style/Theme.Jarvis">
                   <activity android:name=".MainActivity" android:exported="true">
                       <intent-filter>
@@ -72,30 +133,198 @@ jobs:
               </application>
           </manifest>
           JARVIS_EOF
+          mkdir -p $(dirname app/src/main/java/com/jarvis/assistant/BreachView.kt)
+          cat > app/src/main/java/com/jarvis/assistant/BreachView.kt <<'JARVIS_EOF'
+          package com.jarvis.assistant
+
+          import android.animation.ValueAnimator
+          import android.content.Context
+          import android.graphics.Canvas
+          import android.graphics.Color
+          import android.graphics.Paint
+          import android.graphics.Path
+          import android.graphics.Typeface
+          import android.view.View
+          import android.view.animation.LinearInterpolator
+
+          /** Full-screen "SYSTEM BREACH" look-alike lock screen. */
+          class BreachView(c: Context) : View(c) {
+              private val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                  textAlign = Paint.Align.CENTER
+                  typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+              }
+              private var t = 0f
+              private val anim = ValueAnimator.ofFloat(0f, 1f).apply {
+                  duration = 1200
+                  repeatCount = ValueAnimator.INFINITE
+                  interpolator = LinearInterpolator()
+                  addUpdateListener { t = it.animatedValue as Float; invalidate() }
+              }
+
+              override fun onAttachedToWindow() { super.onAttachedToWindow(); anim.start() }
+              override fun onDetachedFromWindow() { anim.cancel(); super.onDetachedFromWindow() }
+
+              override fun onDraw(cv: Canvas) {
+                  val w = width.toFloat(); val h = height.toFloat()
+                  cv.drawColor(Color.BLACK)
+                  val red = if (t < 0.5f) 0xFFFF1744.toInt() else 0xFF8B0000.toInt()
+
+                  p.style = Paint.Style.FILL; p.color = 0x33FF1744
+                  cv.drawRect(0f, h * t, w, h * t + h * 0.02f, p)
+
+                  p.style = Paint.Style.STROKE; p.strokeWidth = w * 0.015f; p.color = red
+                  cv.drawRect(w * 0.03f, w * 0.03f, w * 0.97f, h - w * 0.03f, p)
+
+                  val cx = w / 2; val ty = h * 0.2f; val ts = w * 0.18f
+                  val tri = Path().apply {
+                      moveTo(cx, ty); lineTo(cx + ts, ty + ts * 1.6f); lineTo(cx - ts, ty + ts * 1.6f); close()
+                  }
+                  p.strokeWidth = w * 0.02f; p.strokeJoin = Paint.Join.ROUND
+                  cv.drawPath(tri, p)
+
+                  p.style = Paint.Style.FILL
+                  p.textSize = ts * 1.1f; cv.drawText("!", cx, ty + ts * 1.45f, p)
+                  p.textSize = w * 0.11f; cv.drawText("SYSTEM BREACH", cx, h * 0.52f, p)
+                  p.textSize = w * 0.045f; p.color = Color.WHITE
+                  cv.drawText("UNAUTHORIZED ACCESS DETECTED", cx, h * 0.58f, p)
+                  cv.drawText("ALL FUNCTIONS LOCKED", cx, h * 0.62f, p)
+                  p.color = red
+                  cv.drawText("SPEAK THE PASSWORD TO RESTORE", cx, h * 0.70f, p)
+              }
+          }
+          JARVIS_EOF
+          mkdir -p $(dirname app/src/main/java/com/jarvis/assistant/FaceView.kt)
+          cat > app/src/main/java/com/jarvis/assistant/FaceView.kt <<'JARVIS_EOF'
+          package com.jarvis.assistant
+
+          import android.animation.ValueAnimator
+          import android.content.Context
+          import android.graphics.Canvas
+          import android.graphics.Paint
+          import android.view.View
+          import android.view.animation.LinearInterpolator
+          import kotlin.math.abs
+          import kotlin.math.sin
+
+          enum class FaceState { IDLE, SPEAKING }
+
+          object JarvisState {
+              val views = mutableSetOf<FaceView>()
+              var state = FaceState.IDLE
+                  set(v) { field = v; views.forEach { it.postInvalidate() } }
+          }
+
+          /** Jarvis's animated face: glowing ring, blinking eyes, mouth that moves while speaking. */
+          class FaceView(c: Context) : View(c) {
+              private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+              private var t = 0f
+              private val tau = 6.2831855f
+              private val anim = ValueAnimator.ofFloat(0f, 1f).apply {
+                  duration = 4000
+                  repeatCount = ValueAnimator.INFINITE
+                  interpolator = LinearInterpolator()
+                  addUpdateListener { t = it.animatedValue as Float; invalidate() }
+              }
+
+              override fun onAttachedToWindow() { super.onAttachedToWindow(); JarvisState.views.add(this); anim.start() }
+              override fun onDetachedFromWindow() { anim.cancel(); JarvisState.views.remove(this); super.onDetachedFromWindow() }
+
+              override fun onDraw(cv: Canvas) {
+                  val w = width.toFloat(); val h = height.toFloat(); val s = minOf(w, h)
+                  val cx = w / 2; val cy = h / 2; val r = s / 2 * 0.92f
+                  val speaking = JarvisState.state == FaceState.SPEAKING
+                  val col = if (speaking) 0xFF00E5FF.toInt() else 0xFF0091EA.toInt()
+
+                  p.style = Paint.Style.FILL; p.color = 0xFF0A1628.toInt(); p.alpha = 255
+                  cv.drawCircle(cx, cy, r, p)
+
+                  p.style = Paint.Style.STROKE; p.strokeWidth = s * 0.03f; p.color = col
+                  p.alpha = (160 + 95 * sin(t * tau)).toInt()
+                  cv.drawCircle(cx, cy, r, p)
+                  p.alpha = 255
+
+                  val blink = if (t in 0.92f..0.97f) 0.1f else 1f
+                  p.style = Paint.Style.FILL; p.color = col
+                  val ey = cy - r * 0.2f; val ex = r * 0.4f; val ew = r * 0.16f; val eh = r * 0.22f * blink
+                  cv.drawOval(cx - ex - ew, ey - eh, cx - ex + ew, ey + eh, p)
+                  cv.drawOval(cx + ex - ew, ey - eh, cx + ex + ew, ey + eh, p)
+
+                  val my = cy + r * 0.42f
+                  if (speaking) {
+                      val open = r * 0.04f + r * 0.16f * abs(sin(t * tau * 24))
+                      cv.drawOval(cx - r * 0.28f, my - open, cx + r * 0.28f, my + open, p)
+                  } else {
+                      p.style = Paint.Style.STROKE; p.strokeWidth = s * 0.03f; p.strokeCap = Paint.Cap.ROUND
+                      cv.drawLine(cx - r * 0.25f, my, cx + r * 0.25f, my, p)
+                  }
+              }
+          }
+          JARVIS_EOF
           mkdir -p $(dirname app/src/main/java/com/jarvis/assistant/JarvisAccessibility.kt)
           cat > app/src/main/java/com/jarvis/assistant/JarvisAccessibility.kt <<'JARVIS_EOF'
           package com.jarvis.assistant
 
+          import android.Manifest
           import android.accessibilityservice.AccessibilityService
           import android.content.Intent
+          import android.content.pm.PackageManager
+          import android.graphics.PixelFormat
+          import android.net.Uri
+          import android.os.Build
           import android.os.Bundle
+          import android.os.Handler
+          import android.os.Looper
+          import android.os.SystemClock
+          import android.provider.ContactsContract.CommonDataKinds.Phone
+          import android.view.KeyEvent
+          import android.view.View
+          import android.view.WindowManager
           import android.view.accessibility.AccessibilityEvent
           import android.view.accessibility.AccessibilityNodeInfo as Node
 
           class JarvisAccessibility : AccessibilityService() {
               companion object { var instance: JarvisAccessibility? = null }
 
+              private val main = Handler(Looper.getMainLooper())
+              private var breach: BreachView? = null
+              private var volCount = 0
+              private var lastVol = 0L
+              private val autoOff = Runnable { hideBreach() }
+              private val words = mapOf("zero" to "0", "oh" to "0", "one" to "1", "two" to "2", "three" to "3",
+                  "four" to "4", "five" to "5", "six" to "6", "seven" to "7", "eight" to "8", "nine" to "9")
+
               override fun onServiceConnected() { instance = this }
-              override fun onUnbind(i: Intent?): Boolean { instance = null; return super.onUnbind(i) }
+              override fun onUnbind(i: Intent?): Boolean { hideBreach(); instance = null; return super.onUnbind(i) }
               override fun onAccessibilityEvent(e: AccessibilityEvent?) {}
               override fun onInterrupt() {}
 
+              // Safety exit: press volume down 3 times quickly while the breach screen is showing.
+              override fun onKeyEvent(event: KeyEvent): Boolean {
+                  if (breach != null && event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                      if (event.action == KeyEvent.ACTION_DOWN) {
+                          val now = SystemClock.uptimeMillis()
+                          volCount = if (now - lastVol < 2000) volCount + 1 else 1
+                          lastVol = now
+                          if (volCount >= 3) { volCount = 0; hideBreach() }
+                      }
+                      return true
+                  }
+                  return super.onKeyEvent(event)
+              }
+
               fun run(cmd: String): String {
-                  val c = cmd.lowercase().trim()
+                  val raw = cmd.trim()
+                  val c = raw.lowercase()
                   return when {
+                      c == "black out" || c == "blackout" || c == "black-out" -> showBreach()
+                      c == "pleasure" -> hideBreach()
+                      c.startsWith("dial") -> dial(c.removePrefix("dial").trim())
+                      c.startsWith("call ") -> call(c.removePrefix("call ").trim())
+                      c == "search" || c == "search bar" || c == "open search" || c == "open search bar" -> openSearch()
+                      c.startsWith("search ") -> search(raw.substring(7).removePrefix("for ").trim())
                       c.startsWith("open ") -> openApp(c.removePrefix("open ").trim())
                       c.startsWith("click ") || c.startsWith("tap ") -> click(c.substringAfter(" "))
-                      c.startsWith("type ") -> type(c.removePrefix("type "))
+                      c.startsWith("type ") -> type(raw.substring(5))
                       c == "go back" || c == "back" -> g(GLOBAL_ACTION_BACK, "Going back")
                       c == "go home" || c == "home" -> g(GLOBAL_ACTION_HOME, "Home")
                       c.contains("recent") -> g(GLOBAL_ACTION_RECENTS, "Recent apps")
@@ -110,6 +339,80 @@ jobs:
 
               private fun g(action: Int, msg: String): String { performGlobalAction(action); return msg }
 
+              // ---------- Blackout / breach screen ----------
+              private fun showBreach(): String {
+                  if (breach != null) return "Already locked down"
+                  try {
+                      val v = BreachView(this)
+                      @Suppress("DEPRECATION")
+                      v.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                          View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                          View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                      val lp = WindowManager.LayoutParams(
+                          WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
+                          WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                          WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                              WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                              WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+                          PixelFormat.OPAQUE
+                      )
+                      lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                      getSystemService(WindowManager::class.java).addView(v, lp)
+                      breach = v
+                      main.postDelayed(autoOff, 10 * 60 * 1000L) // safety: auto-restore after 10 minutes
+                      return "System breach detected. Locking down."
+                  } catch (e: Exception) { return "I couldn't show the breach screen" }
+              }
+
+              private fun hideBreach(): String {
+                  val v = breach ?: return "Systems are already normal"
+                  main.removeCallbacks(autoOff)
+                  try { getSystemService(WindowManager::class.java).removeView(v) } catch (e: Exception) { }
+                  breach = null
+                  return "Welcome back. Systems restored."
+              }
+
+              // ---------- Calls ----------
+              private fun digitsOf(s: String) =
+                  s.split(" ").joinToString("") { words[it] ?: it }.filter { it.isDigit() || it == '+' }
+
+              private fun dial(arg: String): String {
+                  val d = digitsOf(arg)
+                  startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(d)))
+                      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                  return if (d.isEmpty()) "Opening the dialer" else "Dialing $d"
+              }
+
+              private fun findNumber(name: String): String? {
+                  contentResolver.query(Phone.CONTENT_URI, arrayOf(Phone.NUMBER),
+                      "${Phone.DISPLAY_NAME} LIKE ?", arrayOf("%$name%"), null)?.use {
+                      if (it.moveToFirst()) return it.getString(0)
+                  }
+                  return null
+              }
+
+              private fun call(arg: String): String {
+                  val num = digitsOf(arg)
+                  val isNumber = num.length >= 3 && arg.split(" ").all { it in words || it.any(Char::isDigit) }
+                  val target: String
+                  val label: String
+                  if (isNumber) { target = num; label = num } else {
+                      if (checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED)
+                          return "Please allow contacts permission in the Jarvis app"
+                      target = findNumber(arg) ?: return "I can't find $arg in your contacts"
+                      label = arg
+                  }
+                  val uri = Uri.parse("tel:" + Uri.encode(target))
+                  return if (checkSelfPermission(Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
+                      startActivity(Intent(Intent.ACTION_CALL, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                      "Calling $label"
+                  } else {
+                      startActivity(Intent(Intent.ACTION_DIAL, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                      "Opening the dialer. Allow phone permission to call directly."
+                  }
+              }
+
+              // ---------- Screen control ----------
               private fun openApp(name: String): String {
                   val pm = packageManager
                   val pkg = pm.getInstalledApplications(0).firstOrNull {
@@ -139,6 +442,16 @@ jobs:
                   return null
               }
 
+              private fun findEditable(n: Node?): Node? {
+                  if (n == null) return null
+                  if (n.isEditable) return n
+                  for (i in 0 until n.childCount) {
+                      val r = findEditable(n.getChild(i))
+                      if (r != null) return r
+                  }
+                  return null
+              }
+
               private fun scroll(dir: Int): String {
                   val s = findScrollable(rootInActiveWindow) ?: return "Nothing to scroll"
                   s.performAction(dir)
@@ -146,10 +459,38 @@ jobs:
               }
 
               private fun type(text: String): String {
-                  val f = rootInActiveWindow?.findFocus(Node.FOCUS_INPUT) ?: return "Tap a text box first"
-                  val b = Bundle().apply { putCharSequence(Node.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) }
+                  val root = rootInActiveWindow ?: return "I can't see the screen"
+                  val f = root.findFocus(Node.FOCUS_INPUT)
+                      ?: findEditable(root)?.also { it.performAction(Node.ACTION_FOCUS) }
+                      ?: return "I can't find a text box"
+                  val old = if (f.isShowingHintText) "" else f.text?.toString() ?: ""
+                  val full = if (old.isEmpty()) text else "$old $text"
+                  val b = Bundle().apply { putCharSequence(Node.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, full) }
                   f.performAction(Node.ACTION_SET_TEXT, b)
                   return "Typed"
+              }
+
+              private fun openSearch(): String {
+                  val root = rootInActiveWindow ?: return "I can't see the screen"
+                  val n = root.findAccessibilityNodeInfosByText("search").firstOrNull()
+                      ?: findEditable(root) ?: return "I can't see a search bar here"
+                  var x: Node? = n
+                  while (x != null && !x.isClickable && !x.isEditable) x = x.parent
+                  (x ?: n).performAction(Node.ACTION_CLICK)
+                  return "Search bar open"
+              }
+
+              private fun search(q: String): String {
+                  val r = openSearch()
+                  if (r != "Search bar open") return r
+                  main.postDelayed({
+                      type(q)
+                      if (Build.VERSION.SDK_INT >= 30) {
+                          rootInActiveWindow?.findFocus(Node.FOCUS_INPUT)
+                              ?.performAction(Node.AccessibilityAction.ACTION_IME_ENTER.id)
+                      }
+                  }, 900)
+                  return "Searching for $q"
               }
           }
           JARVIS_EOF
@@ -160,8 +501,10 @@ jobs:
           import android.Manifest
           import android.content.Intent
           import android.content.pm.PackageManager
+          import android.net.Uri
           import android.os.Bundle
           import android.provider.Settings
+          import android.speech.tts.TextToSpeech
           import android.widget.Button
           import android.widget.LinearLayout
           import android.widget.Toast
@@ -170,30 +513,55 @@ jobs:
           import androidx.core.content.ContextCompat
 
           class MainActivity : AppCompatActivity() {
+              private var tts: TextToSpeech? = null
+              private var ttsReady = false
+
+              override fun onDestroy() { tts?.shutdown(); super.onDestroy() }
+
               override fun onCreate(s: Bundle?) {
                   super.onCreate(s)
                   val a = this
-                  val l = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL; setPadding(48, 96, 48, 48) }
-                  l.addView(Button(a).apply {
-                      text = "1. Allow microphone"
-                      setOnClickListener {
-                          ActivityCompat.requestPermissions(a,
-                              arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS), 1)
+                  val d = resources.displayMetrics.density
+                  val l = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL; setPadding(48, 48, 48, 48) }
+                  tts = TextToSpeech(a) { ttsReady = it == TextToSpeech.SUCCESS }
+                  l.addView(FaceView(a), LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (260 * d).toInt()))
+                  fun btn(label: String, click: () -> Unit) = l.addView(Button(a).apply {
+                      text = label; setOnClickListener { click() }
+                  })
+                  btn("1. Allow microphone, calls & contacts") {
+                      ActivityCompat.requestPermissions(a,
+                          arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS,
+                              Manifest.permission.CALL_PHONE, Manifest.permission.READ_CONTACTS), 1)
+                  }
+                  btn("2. Enable Jarvis accessibility") {
+                      startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                  }
+                  btn("3. Show face over other apps") {
+                      startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+                  }
+                  btn("4. Start listening") {
+                      if (ContextCompat.checkSelfPermission(a, Manifest.permission.RECORD_AUDIO) ==
+                          PackageManager.PERMISSION_GRANTED) {
+                          ContextCompat.startForegroundService(a, Intent(a, VoiceService::class.java))
+                      } else Toast.makeText(a, "Do step 1 first", Toast.LENGTH_LONG).show()
+                  }
+                  btn("Change voice (tap until it sounds male)") {
+                      val t = tts
+                      val vs = t?.voices?.filter { it.locale.language == "en" && !it.isNetworkConnectionRequired }
+                          ?.sortedBy { it.name }
+                      if (!ttsReady || t == null || vs.isNullOrEmpty()) {
+                          Toast.makeText(a, "Voices not ready, try again", Toast.LENGTH_SHORT).show()
+                          return@btn
                       }
-                  })
-                  l.addView(Button(a).apply {
-                      text = "2. Enable Jarvis accessibility"
-                      setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
-                  })
-                  l.addView(Button(a).apply {
-                      text = "3. Start listening"
-                      setOnClickListener {
-                          if (ContextCompat.checkSelfPermission(a, Manifest.permission.RECORD_AUDIO) ==
-                              PackageManager.PERMISSION_GRANTED) {
-                              ContextCompat.startForegroundService(a, Intent(a, VoiceService::class.java))
-                          } else Toast.makeText(a, "Do step 1 first", Toast.LENGTH_LONG).show()
-                      }
-                  })
+                      val p = getSharedPreferences("j", MODE_PRIVATE)
+                      val next = vs[(vs.indexOfFirst { it.name == p.getString("voice", null) } + 1) % vs.size]
+                      p.edit().putString("voice", next.name).apply()
+                      t.voice = next
+                      t.setPitch(0.8f)
+                      t.speak("Hello, I am Jarvis", TextToSpeech.QUEUE_FLUSH, null, "x")
+                      Toast.makeText(a, "Voice ${vs.indexOf(next) + 1} of ${vs.size}", Toast.LENGTH_SHORT).show()
+                  }
+                  btn("Stop Jarvis") { stopService(Intent(a, VoiceService::class.java)) }
                   setContentView(l)
               }
           }
@@ -207,14 +575,19 @@ jobs:
           import android.app.Service
           import android.content.Intent
           import android.content.pm.ServiceInfo
+          import android.graphics.PixelFormat
           import android.os.Bundle
           import android.os.Handler
           import android.os.IBinder
           import android.os.Looper
+          import android.provider.Settings
           import android.speech.RecognitionListener
           import android.speech.RecognizerIntent
           import android.speech.SpeechRecognizer
           import android.speech.tts.TextToSpeech
+          import android.speech.tts.UtteranceProgressListener
+          import android.view.Gravity
+          import android.view.WindowManager
           import androidx.core.app.NotificationCompat
           import androidx.core.app.ServiceCompat
 
@@ -222,6 +595,14 @@ jobs:
               private lateinit var sr: SpeechRecognizer
               private lateinit var tts: TextToSpeech
               private val h = Handler(Looper.getMainLooper())
+              private var overlay: FaceView? = null
+
+              private val ttsListener = object : UtteranceProgressListener() {
+                  override fun onStart(id: String?) { h.post { JarvisState.state = FaceState.SPEAKING } }
+                  override fun onDone(id: String?) { h.post { JarvisState.state = FaceState.IDLE } }
+                  @Deprecated("Deprecated in Java")
+                  override fun onError(id: String?) { h.post { JarvisState.state = FaceState.IDLE } }
+              }
 
               override fun onBind(i: Intent?): IBinder? = null
 
@@ -232,10 +613,48 @@ jobs:
                   val n = NotificationCompat.Builder(this, "j").setContentTitle("Jarvis is listening")
                       .setSmallIcon(android.R.drawable.ic_btn_speak_now).build()
                   ServiceCompat.startForeground(this, 1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
-                  tts = TextToSpeech(this) {}
+                  tts = TextToSpeech(this) {
+                      if (it == TextToSpeech.SUCCESS) { tts.setOnUtteranceProgressListener(ttsListener); applyVoice() }
+                  }
                   sr = SpeechRecognizer.createSpeechRecognizer(this)
                   sr.setRecognitionListener(this)
+                  showFace()
                   listen()
+              }
+
+              override fun onStartCommand(i: Intent?, f: Int, id: Int): Int {
+                  if (overlay == null) showFace()
+                  return START_NOT_STICKY
+              }
+
+              private fun applyVoice() {
+                  val saved = getSharedPreferences("j", MODE_PRIVATE).getString("voice", null)
+                  val male = listOf("en-gb-x-rjs-local", "en-gb-x-gbd-local", "en-gb-x-gbb-local",
+                      "en-us-x-iom-local", "en-us-x-iol-local", "en-us-x-tpd-local")
+                  val vs = tts.voices?.filter { it.locale.language == "en" && !it.isNetworkConnectionRequired }
+                      ?.sortedBy { it.name } ?: emptyList()
+                  val v = vs.firstOrNull { it.name == saved } ?: vs.firstOrNull { it.name in male } ?: vs.firstOrNull()
+                  if (v != null) tts.voice = v
+                  tts.setPitch(0.8f)
+                  tts.setSpeechRate(0.95f)
+              }
+
+              private fun showFace() {
+                  if (!Settings.canDrawOverlays(this)) return
+                  try {
+                      val d = resources.displayMetrics.density
+                      val size = (110 * d).toInt()
+                      val lp = WindowManager.LayoutParams(
+                          size, size, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                          WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                              WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                              WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                          PixelFormat.TRANSLUCENT
+                      ).apply { gravity = Gravity.TOP or Gravity.END; x = (8 * d).toInt(); y = (120 * d).toInt() }
+                      val v = FaceView(this)
+                      getSystemService(WindowManager::class.java).addView(v, lp)
+                      overlay = v
+                  } catch (e: Exception) { }
               }
 
               private fun listen() {
@@ -245,9 +664,9 @@ jobs:
               }
 
               override fun onResults(r: Bundle?) {
-                  val t = r?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.lowercase() ?: ""
-                  if (t.startsWith("jarvis")) {
-                      val cmd = t.removePrefix("jarvis").trim(' ', ',')
+                  val t = r?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: ""
+                  if (t.lowercase().startsWith("jarvis")) {
+                      val cmd = t.substring(6).trim(' ', ',', '.')
                       val reply = JarvisAccessibility.instance?.run(cmd) ?: "Please enable the Jarvis accessibility service"
                       tts.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "j")
                   }
@@ -255,7 +674,15 @@ jobs:
               }
 
               override fun onError(e: Int) { h.postDelayed({ listen() }, 600) }
-              override fun onDestroy() { h.removeCallbacksAndMessages(null); sr.destroy(); tts.shutdown(); super.onDestroy() }
+
+              override fun onDestroy() {
+                  h.removeCallbacksAndMessages(null)
+                  try { overlay?.let { getSystemService(WindowManager::class.java).removeView(it) } } catch (e: Exception) { }
+                  JarvisState.state = FaceState.IDLE
+                  sr.destroy(); tts.shutdown()
+                  super.onDestroy()
+              }
+
               override fun onReadyForSpeech(p: Bundle?) {}
               override fun onBeginningOfSpeech() {}
               override fun onRmsChanged(v: Float) {}
@@ -280,7 +707,8 @@ jobs:
               android:accessibilityFeedbackType="feedbackGeneric"
               android:canRetrieveWindowContent="true"
               android:canPerformGestures="true"
-              android:accessibilityFlags="flagDefault|flagReportViewIds|flagIncludeNotImportantViews"
+              android:canRequestFilterKeyEvents="true"
+              android:accessibilityFlags="flagDefault|flagReportViewIds|flagIncludeNotImportantViews|flagRequestFilterKeyEvents"
               android:description="@string/app_name"
               android:notificationTimeout="100"/>
           JARVIS_EOF
@@ -303,6 +731,7 @@ jobs:
           rootProject.name = "Jarvis"
           include(":app")
           JARVIS_EOF
+          base64 -d app/debug.keystore.b64 > app/debug.keystore
 
       - name: Build APK
         working-directory: jarvis
